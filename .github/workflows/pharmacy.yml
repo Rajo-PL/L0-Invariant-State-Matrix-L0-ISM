@@ -1,0 +1,38 @@
+name: Invariant Bytes Proof of Concept (mCDU & Pharmacy)
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch: # Pozwala na ręczne uruchomienie z zakładki Actions
+
+jobs:
+  run-simulations:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Pobranie kodu repozytorium
+      uses: actions/checkout@v4
+
+    - name: Konfiguracja środowiska Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Instalacja bibliotek matematycznych
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r scripts/requirements.txt
+
+    - name: L0 Enclave - Uruchomienie Symulatora mCDU
+      run: python scripts/symulator_ib_mcdu.py
+
+    - name: L0 Enclave - Uruchomienie Symulatora Apteki (Green Leaf)
+      run: python scripts/symulator_ib_pharmacy.py
+
+    - name: Zapisanie dowodów inżynieryjnych (Artifacts)
+      uses: actions/upload-artifact@v4
+      with:
+        name: Invariant_Bytes_Proofs
+        path: |
+          invariant_bytes_proof_of_concept.png
+          ib_pharmacy_proof_of_concept.png
