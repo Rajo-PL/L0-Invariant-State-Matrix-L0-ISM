@@ -3,7 +3,7 @@ import numpy as np
 
 # --- GITHUB ACTIONS FIX ---
 import matplotlib
-matplotlib.use('Agg')
+matplotlib.use('Agg') # Wymusza generowanie plików graficznych w tle bez GUI
 import matplotlib.pyplot as plt
 # --------------------------
 
@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 
 STATE_SPACE = list(range(-9, 10))
 
-# Action Codes for Pharmacy Node
+# Action Codes for Pharmacy Node (Legal/Technical states)
 ACT_HARD_STOP = -999        # Absorbing Boundary: Legal/Technical Interdiction (Do not dispense)
 ACT_STORE_FORWARD = 50      # Offline Mode: Dispense and encrypt via T-OTP
 ACT_ONLINE_DISPENSE = 0     # Absolute Equilibrium: Normal P1 online dispensing
@@ -46,7 +46,7 @@ def build_pharmacy_ib_table():
                     action = ACT_ONLINE_DISPENSE
                     
                 # AXIOM 4: Network degraded/offline, Buffer has space, Drug is safe -> T-OTP
-                elif sn < 0 and sb < 9:
+                elif sn < 0 and sb < 9 and sr < 9:
                     action = ACT_STORE_FORWARD
                     
                 else:
@@ -55,7 +55,7 @@ def build_pharmacy_ib_table():
                 
                 lookup_table[ib_tuple] = action
 
-    # Formal Verification
+    # Formal Verification (Z3 conceptual check)
     expected_states = 19 ** 3
     assert len(lookup_table) == expected_states, "ERROR: Incomplete state space!"
     assert lookup_table[(0, 0, 0)] == ACT_ONLINE_DISPENSE, "ERROR: Zero-point violation!"
@@ -64,12 +64,13 @@ def build_pharmacy_ib_table():
     
     return lookup_table
 
+
 # ==============================================================================
-# 2. DISCRETE QUANTIZER
+# 2. DISCRETE QUANTIZER FOR ABSTRACT METRICS
 # ==============================================================================
 
 class StepQuantizer:
-    """Maps continuous physical metrics (ms latency, buffer bytes) to discrete [-9, 9]"""
+    """Maps continuous abstract metrics (ms latency, buffer bytes) to discrete [-9, 9]"""
     def __init__(self, min_val, max_val, scale_min, scale_max):
         self.min_val = min_val
         self.max_val = max_val
@@ -82,6 +83,7 @@ class StepQuantizer:
         discrete_val = self.scale_min + ratio * (self.scale_max - self.scale_min)
         return int(np.round(discrete_val))
 
+
 # ==============================================================================
 # 3. PHARMACY OFFLINE PROTOCOL SIMULATION
 # ==============================================================================
@@ -93,7 +95,7 @@ def run_simulation():
     
     ib_table = build_pharmacy_ib_table()
     print(f"[OK] Generated and formally verified {len(ib_table)} pharmaceutical logic states.")
-    print("[OK] GBNF/Z3 structural limits enforced for T-OTP Store & Forward.\n")
+    print("[OK] Structural limits enforced for T-OTP Store & Forward.\n")
 
     steps = 1000
     time_axis = np.arange(steps)
@@ -102,7 +104,7 @@ def run_simulation():
     q_net = StepQuantizer(min_val=50, max_val=5000, scale_min=0, scale_max=-9) # Latency (ms)
     q_buf = StepQuantizer(min_val=0, max_val=100, scale_min=0, scale_max=9)    # Buffer load (%)
 
-    # Logs
+    # Data logs
     net_latency_log = np.zeros(steps)
     buffer_load_log = np.zeros(steps)
     
@@ -117,22 +119,24 @@ def run_simulation():
     for i in range(steps):
         # 1. Environmental Simulation (Network & Patient Queue)
         if i < 300:
-            latency = 100 + np.random.normal(0, 20)  # Stable P1 Network
+            # Phase 1: Stable P1 Network
+            latency = 100 + np.random.normal(0, 20)  
             risk_class = 0  # Standard drugs
-        elif i < 700:
-            latency = 6000  # P1 System Crash (Timeout)
+        elif i < 750:
+            # Phase 2: P1 System Crash (Timeout)
+            latency = 6000  
             risk_class = 0
             # Buffer fills up as prescriptions are saved offline via T-OTP
-            if action_log[i-1] == ACT_STORE_FORWARD:
-                buffer_fill += 0.35 
+            if i > 0 and action_log[i-1] == ACT_STORE_FORWARD:
+                buffer_fill += 0.25 
         else:
-            latency = 6000  # Still offline
-            # Patient arrives with a highly restricted narcotic prescription
-            risk_class = 9 if i == 750 else 0
-            if action_log[i-1] == ACT_STORE_FORWARD:
-                buffer_fill += 0.35
+            # Phase 3: Still offline, but Patient arrives with highly restricted narcotic
+            latency = 6000  
+            risk_class = 9  # Narcotic prescription (Risk = 9)
+            if i > 0 and action_log[i-1] == ACT_STORE_FORWARD:
+                buffer_fill += 0.25
 
-        # 2. Vectorization
+        # 2. Vectorization to Invariant Bytes Space
         net_latency_log[i] = latency
         buffer_load_log[i] = buffer_fill
         
@@ -150,11 +154,11 @@ def run_simulation():
         action = ib_table[current_tuple]
         
         if hard_stop_step is not None:
-            action = ACT_HARD_STOP # Latch the hard stop
+            action = ACT_HARD_STOP # Latch the hard stop after first violation
             
         action_log[i] = action
 
-        # Trigger Interdiction
+        # 4. Trigger Legal Interdiction
         if action == ACT_HARD_STOP and hard_stop_step is None:
             hard_stop_step = i
             print(f"[!] STEP {i} | IB Vector = {current_tuple} -> LEGAL INTERDICTION!")
@@ -173,7 +177,7 @@ def run_simulation():
     ax1 = axes[0]
     ax1.plot(time_axis, action_log, color='black', linewidth=2, drawstyle='steps-post')
     ax1.axhline(ACT_ONLINE_DISPENSE, color='green', linestyle='--', alpha=0.5, label='Online Dispense (Equilibrium 0)')
-    ax1.axhline(ACT_STORE_FORWARD, color='#1f77b4', linestyle='--', alpha=0.5, label='Offline T-OTP Mode')
+    ax1.axhline(ACT_STORE_FORWARD, color='#1f77b4', linestyle='--', alpha=0.5, label='Offline T-OTP Mode (50)')
     ax1.axhline(ACT_HARD_STOP, color='red', linestyle='--', alpha=0.5, label='Hard Stop (Interdiction -999)')
     
     if hard_stop_step:
@@ -200,7 +204,7 @@ def run_simulation():
     ax2.set_ylim(-10.5, 10.5)
     ax2.set_ylabel('Discrete Scale [-9, 9]', fontweight='bold')
     ax2.set_title('Invariant Byte Vector Trajectory $\mathcal{IB} = (s_{net}, s_{buf}, s_{risk})$', fontweight='bold')
-    ax2.legend(loc='upper left', fontsize=8.5, ncol=4)
+    ax2.legend(loc='lower left', fontsize=8.5, ncol=4)
     ax2.grid(True, alpha=0.3)
 
     # Plot 3: Buffer & Latency Environment
@@ -216,10 +220,11 @@ def run_simulation():
     ax3_twin.plot(time_axis, net_latency_log, color='#1f77b4', linewidth=1, alpha=0.3, label='P1 API Latency [ms]')
     ax3_twin.set_ylabel('Latency [ms]', color='#1f77b4')
     ax3_twin.set_ylim(-100, 7000)
+    ax3_twin.legend(loc='upper right')
 
     plt.tight_layout()
-    plt.savefig('ib_pharmacy_proof.png', dpi=300)
-    print("\n[INFO] Proof plot saved as: 'ib_pharmacy_proof.png'")
+    plt.savefig('ib_pharmacy_proof_of_concept.png', dpi=300)
+    print("\n[INFO] Proof plot saved as: 'ib_pharmacy_proof_of_concept.png'")
 
 if __name__ == "__main__":
     run_simulation()
