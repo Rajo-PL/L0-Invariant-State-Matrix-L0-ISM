@@ -1,0 +1,33 @@
+name: L0 Invariant Bytes Simulation
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch: # Allows manual trigger from the Actions tab
+
+jobs:
+  run-simulation:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Python environment
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install mathematical dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r scripts/requirements.txt
+
+    - name: Run IB Simulator
+      run: python scripts/symulator_ib_mcdu.py
+
+    - name: Save generated plot as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: IB_Proof_of_Concept_Plot
+        path: invariant_bytes_proof_of_concept.png
