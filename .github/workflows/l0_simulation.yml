@@ -1,4 +1,4 @@
-name: L0-ISM Simulation & Formal Verification Pipeline
+name: L0-ISM Formal Verification Pipeline
 
 on: [push, pull_request]
 
@@ -18,16 +18,10 @@ jobs:
         run: |
           pip install z3-solver
 
-      - name: Run SMT Formal Verification Proofs
+      - name: Run Millennium Invariants Formal Proofs
+        run: |
+          python scripts/l0_ism_millennium_invariants_proof.py
+
+      - name: Run Chronology Protection Flux Proof
         run: |
           python scripts/l0_ism_chronology_flux_proof.py
-
-      - name: Run Dynamic L0-ISM Trajectory Simulation
-        run: |
-          python scripts/simulate_l0_ism_dynamics.py
-
-      - name: Archive Simulation Artifacts (CSV)
-        uses: actions/upload-artifact@v4
-        with:
-          name: simulation-telemetry
-          path: "*.csv"
