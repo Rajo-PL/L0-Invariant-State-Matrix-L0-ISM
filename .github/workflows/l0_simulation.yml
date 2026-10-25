@@ -20,11 +20,11 @@ jobs:
 
       - name: Run SMT Formal Verification Proofs
         run: |
-          /scripts/l0_ism_chronology_flux_proof.py
+          python scripts/l0_ism_chronology_flux_proof.py
 
       - name: Run Dynamic L0-ISM Trajectory Simulation
         run: |
-          python simulate_l0_ism_dynamics.py
+          python scripts/simulate_l0_ism_dynamics.py
 
       - name: Archive Simulation Artifacts (CSV)
         uses: actions/upload-artifact@v4
