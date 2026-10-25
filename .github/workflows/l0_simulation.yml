@@ -20,7 +20,7 @@ jobs:
 
       - name: Run SMT Formal Verification Proofs
         run: |
-          python l0_ism_chronology_flux_proof.py
+          /scripts/l0_ism_chronology_flux_proof.py
 
       - name: Run Dynamic L0-ISM Trajectory Simulation
         run: |
