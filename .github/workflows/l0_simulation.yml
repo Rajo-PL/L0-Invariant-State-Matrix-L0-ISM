@@ -1,0 +1,33 @@
+name: L0-ISM Simulation & Formal Verification Pipeline
+
+on: [push, pull_request]
+
+jobs:
+  run-l0-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Dependencies
+        run: |
+          pip install z3-solver
+
+      - name: Run SMT Formal Verification Proofs
+        run: |
+          python l0_ism_chronology_flux_proof.py
+
+      - name: Run Dynamic L0-ISM Trajectory Simulation
+        run: |
+          python simulate_l0_ism_dynamics.py
+
+      - name: Archive Simulation Artifacts (CSV)
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-telemetry
+          path: "*.csv"
